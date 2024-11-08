@@ -57,30 +57,30 @@
 
     initializeGame:
         la $s0, grid
-        li $t0, 0              		# $t0: array counter
-        li $t1, 9              		# $t1: grid counter
+        li $t0, 0              			# $t0: array counter
+        li $t1, 9              			# $t1: grid counter
         
     random_values:
         do_syscall(30)
         move $t4, $a0
-        rem  $t4, $t4, 9       	    # $t4: first random cell index
+        rem  $t4, $t4, 9       	    		# $t4: first random cell index
         
         do_syscall(30)
         move $t5, $a0
-        rem  $t5, $t5, 9		    # $t5: second random cell index
+        rem  $t5, $t5, 9		    	# $t5: second random cell index
         
         beq  $t4, $t5, random_values  
         
     newGame: 
-        bge  $t0, $t1, displayGrid	# i >= 9
+        bge  $t0, $t1, displayGrid		# i >= 9
         sll  $t2, $t0, 2
-        add  $t2, $t2, $s0		    # $t2: address of grid[$t0]
+        add  $t2, $t2, $s0		    	# $t2: address of grid[$t0]
         
         beq  $t0, $t4, insert_value
         beq  $t0, $t5, insert_value
         
         li   $t3, 0			        # empty cell -- 0
-        sw   $t3, 0($t2)		    # store back to grid[$t0]
+        sw   $t3, 0($t2)		    	# store back to grid[$t0]
         
         addi $t0, $t0, 1
         j newGame
@@ -88,7 +88,7 @@
     insert_value:
         li   $t3, 2			        # $t3 = 2
         sw   $t3, 0($t2)
-        addi $t0, $t0, 1		    # increment array counter
+        addi $t0, $t0, 1		    	# increment array counter
         j newGame
 
     displayGrid:
@@ -101,13 +101,13 @@
         li $t2, 0			        # $t2: Column counter
 
     display_cell:
-        sll  $t3, $t0, 2		    # Byte offset for grid[$t0]
+        sll  $t3, $t0, 2		    	# Byte offset for grid[$t0]
         la   $s0, grid
         add  $t3, $s0, $t3
-        lw   $t4, 0($t3)		    # Load grid[$t0] into $t4
+        lw   $t4, 0($t3)		    	# Load grid[$t0] into $t4
 
         bne  $t4, $zero, print_value
-        print_string(space)		    # Print empty space if value is 0
+        print_string(space)		    	# Print empty space if value is 0
         j skip_value
 
     print_value:
@@ -118,14 +118,14 @@
 
     skip_value:
         print_string(bar)
-        addi $t0, $t0, 1            # increment array counter
-        addi $t2, $t2, 1		    # increment column counter
+        addi $t0, $t0, 1            		# increment array counter
+        addi $t2, $t2, 1		    	# increment column counter
         li $t5, 3
         bne $t2, $t5, display_cell
         
         newline
         li $t6, 9			        # $t6: array end checker
-        bne $t0, $t6, display_row	# if not end
+        bne $t0, $t6, display_row		# if not end
         
         print_string(grid_divider)
         j loopGame
@@ -173,7 +173,20 @@
 
     move_right:
         # Code for moving right
-        j loopGame
+        j loopGame	
 
     startState:
-        exit()
+        la $s0, grid
+        li $t0, 0              			# $t0: array counter
+        li $t1, 9              			# $t1: grid counter
+        
+    getInput:
+        bge  $t0, $t1, displayGrid		# i >= 9
+        sll  $t2, $t0, 2
+        add  $t2, $t2, $s0		    	# $t2: address of grid[$t0]
+        
+        get_input($t3)
+        sw   $t3, 0($t2)		    	# store back to grid[$t0]
+        
+        addi $t0, $t0, 1
+        j getInput
