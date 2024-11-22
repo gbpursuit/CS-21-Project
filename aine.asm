@@ -142,6 +142,7 @@
         j loopGame
 
     loopGame:
+        print_string(action_prompt)
         movement()
 
         # Check for W key (Move Up)
@@ -173,15 +174,13 @@
 # ==============================================================
 
     move_up:
-        # Iterate over each column
-        li $t0, 0                     # Column counter (0, 1, 2 for each column)
+        li $t0, 0                     # $t0: column counter (col = 0)
 
     move_up_column_loop:
-        li $t1, 0                     # Row counter within each column
-        li $t2, 0                     # Position to place non-zero values at the top of each column
+        li $t1, 0                     # $t1: row counter (each column)
+        li $t2, 0                     # $t2: position = 0
 
     move_up_shift_loop:
-        # Calculate index in grid for the current cell
         mul $t3, $t1, 3               # Row offset (row * width)
         add $t3, $t3, $t0             # Add column offset
         sll $t4, $t3, 2               # Byte offset for grid[$t3]
@@ -189,10 +188,10 @@
         add $t4, $s0, $t4
         lw $t5, 0($t4)                # Load grid[$t3] into $t5
 
-        bnez $t5, handle_non_zero     # If cell is non-zero, handle it
-        j skip_zero                   # If cell is zero, move to next row
+        bnez $t5, up_handle_non_zero     # If cell is non-zero, handle it
+        j up_skip_zero                   # If cell is zero, move to next row
 
-    handle_non_zero:
+    up_handle_non_zero:
         # Place non-zero value at position indicated by $t2
         mul $t6, $t2, 3               # Calculate target row offset for non-zero cell
         add $t6, $t6, $t0             # Add column offset
@@ -204,23 +203,61 @@
         # Increment target position only if we moved the value
         addi $t2, $t2, 1
 
-    skip_zero:
+    up_skip_zero:
         addi $t1, $t1, 1              # Move to next row in the column
         li $t8, 3
         blt $t1, $t8, move_up_shift_loop   # Repeat for all rows in column
 
         # Clear remaining cells in column after the shifted elements
-        move $t9, $t2                 # Start clearing from the current $t2 position
+        # move $t9, $t2                 # Start clearing from the current $t2 position
 
-    move_up_clear_loop:
-        mul $t6, $t9, 3               # Row offset for clearing
-        add $t6, $t6, $t0             # Column offset
-        sll $t7, $t6, 2               # Byte offset for grid[$t6]
+    # Combine adjacent elements if they are the same
+    move_up_combine_loop:
+        li $t1, 0                      # Reset row counter for combining
+
+    up_combine_check_loop:
+        mul $t3, $t1, 3                # Row offset (row * width)
+        add $t3, $t3, $t0              # Add column offset
+        sll $t4, $t3, 2                # Byte offset for grid[$t3]
+        la $s0, grid
+        add $t4, $s0, $t4
+        lw $t5, 0($t4)                 # Load grid[$t3] (current cell)
+
+        addi $t9, $t1, 1               # $t9 = row + 1 (next row)
+        mul $t6, $t9, 3                # Next row offset (next_row * width)
+        add $t6, $t6, $t0              # Add column offset
+        sll $t7, $t6, 2                # Byte offset for grid[next_row]
         la $s0, grid
         add $t7, $s0, $t7
-        sw $zero, 0($t7)              # Set cell to 0
+        lw $t6, 0($t7)                 # Load grid[next_row] (next cell)
 
-        addi $t9, $t9, 1              # Move to the next row for clearing
+        # If current and next cell are the same and non-zero, combine
+        bne $t5, $t6, up_skip_combine     # Skip if cells are not equal
+        beq $t5, $zero, up_skip_combine   # Skip if cells are zero
+
+        # Combine: multiply current cell by 2, set next cell to 0
+        add $t5, $t5, $t5              # Double the value in the current cell
+        sw $t5, 0($t4)                 # Store doubled value back in current cell
+        sw $zero, 0($t7)               # Set next cell to 0
+
+    up_skip_combine:
+        addi $t1, $t1, 1               # Move to the next row
+        li $t8, 2
+        blt $t1, $t8, up_combine_check_loop   # Repeat until the second-last row
+
+        move $t9, $t2
+
+    # Clear remaining cells in column after the shifted elements
+    move_up_clear_loop:
+        #move $t9, $t2                  # Start clearing from the current $t2 position
+        mul $t6, $t9, 3                # Row offset for clearing
+        add $t6, $t6, $t0              # Column offset
+        sll $t7, $t6, 2                # Byte offset for grid[$t6]
+        la $s0, grid
+        add $t7, $s0, $t7
+        sw $zero, 0($t7)               # Set cell to 0
+
+        addi $t9, $t9, 1               # Move to the next row for clearing
         li $t8, 3
         blt $t9, $t8, move_up_clear_loop
 
@@ -229,19 +266,107 @@
         li $t8, 3
         blt $t0, $t8, move_up_column_loop   # Repeat for all columns
 
-        # Display updated grid after moving up
         j displayGrid
-
-
 # ==============================================================
 
     move_left:
         # Code for moving left
         j loopGame
 
+# ==============================================================
+
     move_down:
-        # Code for moving down
-        j loopGame
+        li $t0, 0                     # $t0: column counter (col = 0)
+
+    move_down_column_loop:
+        li $t1, 2                     # $t1: row counter (start from the bottom, row = 2)
+        li $t2, 2                     # $t2: position = 2 (starting from bottom row)
+
+    move_down_shift_loop:
+        mul $t3, $t1, 3               # Row offset (row * width)
+        add $t3, $t3, $t0             # Add column offset
+        sll $t4, $t3, 2               # Byte offset for grid[$t3]
+        la $s0, grid
+        add $t4, $s0, $t4
+        lw $t5, 0($t4)                # Load grid[$t3] into $t5
+
+        bnez $t5, down_handle_non_zero     # If cell is non-zero, handle it
+        j down_skip_zero                   # If cell is zero, move to next row
+
+    down_handle_non_zero:
+        # Place non-zero value at position indicated by $t2
+        mul $t6, $t2, 3               # Calculate target row offset for non-zero cell
+        add $t6, $t6, $t0             # Add column offset
+        sll $t7, $t6, 2               # Byte offset for grid[$t6]
+        la $s0, grid
+        add $t7, $s0, $t7
+        sw $t5, 0($t7)                # Store non-zero value in new position
+
+        # Decrement target position only if we moved the value
+        addi $t2, $t2, -1             # Decrement position as we are moving down
+
+    down_skip_zero:
+        addi $t1, $t1, -1             # Move to the next row in the column
+        li $t8, -1
+        bgt $t1, $t8, move_down_shift_loop  # Repeat for all rows in column
+
+    # Combine adjacent cells if they are the same
+    move_down_combine_loop:
+        li $t1, 2                     # Start from row 2, second last row (bottom-up)
+        
+    down_combine_check_loop:
+        mul $t3, $t1, 3                # Row offset (row * width)
+        add $t3, $t3, $t0              # Add column offset
+        sll $t4, $t3, 2                # Byte offset for grid[$t3]
+        la $s0, grid
+        add $t4, $s0, $t4
+        lw $t5, 0($t4)                 # Load grid[$t3] (current cell)
+
+        addi $t9, $t1, -1              # $t9 = row - 1 (previous row)
+        mul $t6, $t9, 3                # Previous row offset
+        add $t6, $t6, $t0              # Add column offset
+        sll $t7, $t6, 2                # Byte offset for grid[previous_row]
+        la $s0, grid
+        add $t7, $s0, $t7
+        lw $t6, 0($t7)                 # Load grid[previous_row] (next cell)
+
+        # If current and previous cells are the same and non-zero, combine
+        bne $t5, $t6, down_skip_combine     # Skip if cells are not equal
+        beq $t5, $zero, down_skip_combine   # Skip if cells are zero
+
+        # Combine: multiply current cell by 2, set previous cell to 0
+        add $t5, $t5, $t5              # Double the value in the current cell
+        sw $t5, 0($t4)                 # Store doubled value back in current cell
+        sw $zero, 0($t7)               # Set previous cell to 0
+
+    down_skip_combine:
+        addi $t1, $t1, -1              # Move to the next row
+        li $t8, 0
+        bgt $t1, $t8, down_combine_check_loop   # Repeat until the second row
+
+        # Clear remaining cells in column after the shifted elements
+        move $t9, $t2                 # Start clearing from the current $t2 position
+
+    move_down_clear_loop:
+        mul $t6, $t9, 3               # Row offset for clearing
+        add $t6, $t6, $t0             # Column offset
+        sll $t7, $t6, 2               # Byte offset for grid[$t6]
+        la $s0, grid
+        add $t7, $s0, $t7
+        sw $zero, 0($t7)              # Set cell to 0
+
+        addi $t9, $t9, -1             # Move to the next row for clearing
+        li $t8, -1
+        bgt $t9, $t8, move_down_clear_loop
+
+        # Move to the next column
+        addi $t0, $t0, 1
+        li $t8, 3
+        blt $t0, $t8, move_down_column_loop  # Repeat for all columns
+
+        j displayGrid
+
+# ==============================================================
 
     move_right:
         # Code for moving right
