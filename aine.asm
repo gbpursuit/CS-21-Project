@@ -46,6 +46,7 @@
     # GRID SPACING
     .align 2
     grid: .space 36
+    empty:.space 36
     width: .word 3
 
     # DIRECTION MOVES
@@ -184,6 +185,7 @@
         mul $t3, $t1, 3               # Row offset (row * width)
         add $t3, $t3, $t0             # Add column offset
         sll $t4, $t3, 2               # Byte offset for grid[$t3]
+
         la $s0, grid
         add $t4, $s0, $t4
         lw $t5, 0($t4)                # Load grid[$t3] into $t5
@@ -266,7 +268,7 @@
         li $t8, 3
         blt $t0, $t8, move_up_column_loop   # Repeat for all columns
 
-        j displayGrid
+        j spawn_get_empty
 # ==============================================================
 
     move_left:
@@ -364,7 +366,7 @@
         li $t8, 3
         blt $t0, $t8, move_down_column_loop  # Repeat for all columns
 
-        j displayGrid
+        j spawn_get_empty
 
 # ==============================================================
 
@@ -388,3 +390,61 @@
         
         addi $t0, $t0, 1
         j getInput
+
+# ==============================================================
+# Get Empty and Spawn tiles
+
+    spawn_get_empty:
+        la $s0, grid          # Base address of arr[]
+        la $s1, empty         # Base address of empty_space[]
+
+        # Initialize variables
+        li $t0, 0             # i = 0
+        li $t1, 0             # count = 0
+        li $t2, 9             # max grid (MAX_GRID)
+
+        for_loop:
+            bge $t0, $t2, end_loop 
+
+            # Check if arr[i] == 0
+            sll $t3, $t0, 2        # Byte offset for arr[i]
+            add $t3, $s0, $t3      # Address of arr[i]
+            lw  $t4, 0($t3)        # Load arr[i] into $t4
+            beqz $t4, init_empty   
+
+            addi $t0, $t0, 1       # i++
+            j for_loop             
+
+        init_empty:
+            sll $t5, $t1, 2        # Byte offset for empty_space[count]
+            add $t5, $s1, $t5      # Address of empty_space[count]
+            sw  $t0, 0($t5)        # empty_space[count] = i
+
+            addi $t1, $t1, 1       # count++
+            addi $t0, $t0, 1       # i++
+            j for_loop            
+
+        end_loop:
+            beqz $t1, displayGrid  
+
+            do_syscall(30)         # Generate random number
+            move $t0, $a0          # Random number in $t0
+            div  $t0, $t1          # rand() / count
+            mfhi $t0               # $t0 = rand() % count
+
+            # Get random_pos = empty_space[rand() % count]
+            sll $t0, $t0, 2        # Byte offset for index
+            add $t0, $s1, $t0      # Address of empty_space[rand() % count]
+            lw  $t2, 0($t0)        # Load random_pos
+
+            # Update arr[random_pos] = 2
+            li  $t4, 2
+            sll $t3, $t2, 2        # Byte offset for random_pos
+            add $t3, $s0, $t3      # Address of arr[random_pos]
+            sw  $t4, 0($t3)        # Store 2 in arr[random_pos]
+
+            j displayGrid          # Jump to displayGrid
+
+
+
+
