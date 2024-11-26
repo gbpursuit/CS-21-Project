@@ -215,107 +215,144 @@
 
 # ============================= MOVE UP ================================
 
-    # move_up:
-    #     newline()
-    #     jal shift_up
-    #     jal combine_up
-    #     jal shift_up
-    #     j spawn_get_empty
-
     move_up:
-        li $t0, 0                     # $t0: column counter (col = 0)
-
-    move_up_column_loop:
-        li $t1, 0                     # $t1: row counter (each column)
-        li $t2, 0                     # $t2: position = 0
-
-    move_up_shift_loop:
-        mul $t3, $t1, 3               # Row offset (row * width)
-        add $t3, $t3, $t0             # Add column offset
-        sll $t4, $t3, 2               # Byte offset for grid[$t3]
-
-        la $s0, grid
-        add $t4, $s0, $t4
-        lw $t5, 0($t4)                # Load grid[$t3] into $t5
-
-        bnez $t5, up_handle_non_zero     # If cell is non-zero, handle it
-        j up_skip_zero                   # If cell is zero, move to next row
-
-    up_handle_non_zero:
-        # Place non-zero value at position indicated by $t2
-        mul $t6, $t2, 3               # Calculate target row offset for non-zero cell
-        add $t6, $t6, $t0             # Add column offset
-        sll $t7, $t6, 2               # Byte offset for grid[$t6]
-        la $s0, grid
-        add $t7, $s0, $t7
-        sw $t5, 0($t7)                # Store non-zero value in new position
-
-        # Increment target position only if we moved the value
-        addi $t2, $t2, 1
-
-    up_skip_zero:
-        addi $t1, $t1, 1              # Move to next row in the column
-        li $t8, 3
-        blt $t1, $t8, move_up_shift_loop   # Repeat for all rows in column
-
-        # Clear remaining cells in column after the shifted elements
-        # move $t9, $t2                 # Start clearing from the current $t2 position
-    # Combine adjacent elements if they are the same
-    move_up_combine_loop:
-        li $t1, 0                      # Reset row counter for combining
-
-    up_combine_check_loop:
-        mul $t3, $t1, 3                # Row offset (row * width)
-        add $t3, $t3, $t0              # Add column offset
-        sll $t4, $t3, 2                # Byte offset for grid[$t3]
-        la $s0, grid
-        add $t4, $s0, $t4
-        lw $t5, 0($t4)                 # Load grid[$t3] (current cell)
-
-        addi $t9, $t1, 1               # $t9 = row + 1 (next row)
-        mul $t6, $t9, 3                # Next row offset (next_row * width)
-        add $t6, $t6, $t0              # Add column offset
-        sll $t7, $t6, 2                # Byte offset for grid[next_row]
-        la $s0, grid
-        add $t7, $s0, $t7
-        lw $t6, 0($t7)                 # Load grid[next_row] (next cell)
-
-        # If current and next cell are the same and non-zero, combine
-        bne $t5, $t6, up_skip_combine     # Skip if cells are not equal
-        beq $t5, $zero, up_skip_combine   # Skip if cells are zero
-
-        # Combine: multiply current cell by 2, set next cell to 0
-        add $t5, $t5, $t5              # Double the value in the current cell
-        sw $t5, 0($t4)                 # Store doubled value back in current cell
-        sw $zero, 0($t7)               # Set next cell to 0
-
-    up_skip_combine:
-        addi $t1, $t1, 1               # Move to the next row
-        li $t8, 2
-        blt $t1, $t8, up_combine_check_loop   # Repeat until the second-last row
-
-        move $t9, $t2
-
-    # Clear remaining cells in column after the shifted elements
-    move_up_clear_loop:
-        #move $t9, $t2                  # Start clearing from the current $t2 position
-        mul $t6, $t9, 3                # Row offset for clearing
-        add $t6, $t6, $t0              # Column offset
-        sll $t7, $t6, 2                # Byte offset for grid[$t6]
-        la $s0, grid
-        add $t7, $s0, $t7
-        sw $zero, 0($t7)               # Set cell to 0
-
-        addi $t9, $t9, 1               # Move to the next row for clearing
-        li $t8, 3
-        blt $t9, $t8, move_up_clear_loop
-
-        # Move to the next column
-        addi $t0, $t0, 1
-        li $t8, 3
-        blt $t0, $t8, move_up_column_loop   # Repeat for all columns
-        
+        newline()
+        jal shift_up
+        jal combine_up
+        jal shift_up
         j spawn_get_empty
+
+    shift_up:
+        la $s0, grid
+        li $t0, 0                       # $t0: col = 0
+
+        up_shift_column_loop:
+            bge $t0, 3, up_shift_done   # col < 3
+            la  $s2, temp               # temp[GRID]             
+            li  $t1, 0                  # 0 to store at temp
+            li  $t2, 0                  # loop counter for temp[GRID] initialization
+
+        up_init_temp:                    # temp initialization
+            bge  $t2, 3, up_done_init_temp
+            sll  $t3, $t2, 2        
+            add  $t3, $s2, $t3
+            sw   $t1, 0($t3)            # Store 0 
+            addi $t2, $t2, 1            # t2++
+            j up_init_temp
+        #changes
+        up_done_init_temp:
+            li $t1, 0                   # $t1: pos = 0
+            li $t2, 3                   # GRID = 3
+            li $t3, 0                   # $t3: row = 0
+
+        up_shift_row_loop:
+            bge  $t3, $t2, up_next_init # row < 3
+            mul  $t4, $t3, $t2          # row * GRID // 
+            add  $t4, $t4, $t0          # row * GRID + col //
+
+            sll  $t5, $t4, 2
+            add  $t5, $s0, $t5
+            lw   $t5, 0($t5)            # Load arr[index]
+
+            bnez $t5, up_arr_to_temp  # arr[index] != 0
+            #changes
+            addi $t3, $t3, 1            # row++
+            j up_shift_row_loop
+
+        up_arr_to_temp:
+            sll  $t6, $t1, 2
+            add  $t6, $s2, $t6          # address of temp[pos]
+            sw   $t5, 0($t6)            # temp[pos] = arr[index]
+            #changes
+            addi $t1, $t1, 1            # pos++
+            #changes
+            addi $t3, $t3, 1            # col++
+            j up_shift_row_loop
+        #second loop
+        up_next_init:
+            li  $t3, 0                   # row = 0
+        
+        up_next_row_loop:
+            bge	 $t3, $t2, up_shift_increment_row # row < 3
+            mul  $t4, $t3, 3            # row * GRID //
+            add  $t4, $t4, $t0          # row * GRID + col //
+            sll  $t5, $t4, 2
+            add  $t5, $s0, $t5          # address of arr[index]
+
+            sll  $t6, $t3, 2
+            add  $t6, $s2, $t6
+            lw   $t6, 0($t6)            # Load temp[col]
+
+            sw   $t6, 0($t5)            # arr[row * GRID + col] = temp[col]
+            addi $t3, $t3, 1
+
+            j up_next_row_loop        
+
+        up_shift_increment_row:
+            addi $t0, $t0, 1            # col++
+            j up_shift_column_loop
+    
+        up_shift_done:
+            jr $ra                      # shift function done
+
+    combine_up:
+        la $s0, grid
+        li $t0, 0                       # $t0: col = 0
+        li $t1, 3                       # t1 = GRID
+
+        up_combine_column_loop:
+            bge $t0, $t1, up_combine_done # col < 3
+            #changes
+            li  $t2, 0                  # $t2: row = 0
+
+        up_combine_row_loop:
+            bge  $t2, 2, up_combine_increment_column
+            # $t4: curr_index
+            mul  $t3, $t2, $t1           # row * GRID //
+            add  $t4, $t3, $t0           # row * GRID + col //
+            
+            sll  $t5, $t4, 2
+            add  $t5, $s0, $t5
+            lw   $t7, 0($t5)            # Load arr[curr_index]
+            
+            #changes: next_index (row + 1) * 3 + col
+            addi $t6, $t2, 1            # row + 1         
+            mul  $t3, $t6, $t1          # (row + 1) * 3
+            add  $t3, $t3, $t0          # (row + 1) * 3 + col
+            
+            # add  $t3, $t3, $t6          # row * GRID + (row + 1)
+            
+            sll  $t6, $t3, 2
+            add  $t6, $s0, $t6
+            lw   $t8, 0($t6)            # Load arr[next_index]
+
+            beq  $t7, $t8, up_combine_next_condition # arr[curr_index] == arr[next_index]
+            
+            #changes
+            addi $t2, $t2, 1            # row++
+            j up_combine_row_loop     
+        
+        up_combine_next_condition:
+            beqz $t7, up_combine_increment_row    # arr[curr_index] != 0
+
+            sll $t7, $t7, 1             # * 2
+            sw  $t7, 0($t5)             # arr[curr_index] *= 2
+
+            li  $t8, 0
+            sw  $t8, 0($t6)             # arr[next_index] = 0
+
+        up_combine_increment_row:
+            #change: second for loop row
+            addi $t2, $t2, 1            # row++
+            j up_combine_row_loop    
+
+        up_combine_increment_column:
+            #changes: top for loop col
+            addi $t0, $t0, 1            # col++
+            j up_combine_column_loop
+
+        up_combine_done:
+            jr $ra                      # combine function done
         
 # ============================= MOVE LEFT ================================
 
@@ -343,14 +380,14 @@
             sw   $t1, 0($t3)            # Store 0 
             addi $t2, $t2, 1            # t2++
             j l_init_temp
-
+        #changes
         l_done_init_temp:
-            li $t1, 0                   # pos
-            li $t2, 3                   # GRID
-            li $t3, 0                   # col
+            li $t1, 0                   # $t1: pos = 0
+            li $t2, 3                   # GRID = 3
+            li $t3, 0                   # $t3: col = 0
 
         l_shift_column_loop:
-            bge  $t3, $t2, l_next_init
+            bge  $t3, $t2, l_next_init  # col < 3
             mul  $t4, $t0, $t2          # row * GRID
             add  $t4, $t4, $t3          # row * GRID + col
 
@@ -359,6 +396,7 @@
             lw   $t5, 0($t5)            # Load arr[index]
 
             bnez $t5, left_arr_to_temp  # arr[index] != 0
+            #changes
             addi $t3, $t3, 1            # col++
             j l_shift_column_loop
 
@@ -366,16 +404,17 @@
             sll  $t6, $t1, 2
             add  $t6, $s2, $t6          # address of temp[pos]
             sw   $t5, 0($t6)            # temp[pos] = arr[index]
+            #changes
             addi $t1, $t1, 1            # pos++
-
+            #changes
             addi $t3, $t3, 1            # col++
             j l_shift_column_loop
-
+        #second loop
         l_next_init:
             li  $t3, 0                   # col = 0
         
         l_next_column_loop:
-            bge	 $t3, $t2, l_shift_increment_row 
+            bge	 $t3, $t2, l_shift_increment_row # col < 3
             mul  $t4, $t0, 3            # row * GRID
             add  $t4, $t4, $t3          # row * GRID + col
             sll  $t5, $t4, 2
@@ -399,12 +438,13 @@
 
     combine_left:
         la $s0, grid
-        li $t0, 0                       # t0 = r0w
+        li $t0, 0                       # t0 = row
         li $t1, 3                       # t1 = GRID
 
         l_combine_row_loop:
-            bge $t0, $t1, l_combine_done
-            li  $t2, 0                  # t2 = col
+            bge $t0, $t1, l_combine_done # row < 3
+            #changes
+            li  $t2, 0                  # $t2: col = 0
 
         l_combine_column_loop:
             bge  $t2, 2, l_combine_increment_row
@@ -415,7 +455,8 @@
             sll  $t5, $t4, 2
             add  $t5, $s0, $t5
             lw   $t7, 0($t5)            # Load arr[curr_index]
-
+            
+            #changes: next_index
             addi $t6, $t2, 1            # col + 1         
             add  $t3, $t3, $t6          # row * GRID + (col + 1)
             sll  $t6, $t3, 2
@@ -423,7 +464,8 @@
             lw   $t8, 0($t6)            # Load arr[next_index]
 
             beq  $t7, $t8, l_combine_next_condition # arr[curr_index] == arr[next_index]
-
+            
+            #changes
             addi $t2, $t2, 1            # col++
             j l_combine_column_loop     
         
@@ -437,10 +479,12 @@
             sw  $t8, 0($t6)             # arr[next_index] = 0
 
         l_combine_increment_column:
+            #change: second for loop col
             addi $t2, $t2, 1            # col++
             j l_combine_column_loop    
 
         l_combine_increment_row:
+            #changes: top for loop row
             addi $t0, $t0, 1            # row++
             j l_combine_row_loop
 
@@ -449,103 +493,145 @@
 
 # ============================= MOVE DOWN ================================
 
-    # move_down:
-    #     newline()
-    #     jal shift_down
-    #     jal combine_down
-    #     jal shift_down
-    #     j spawn_get_empty
-
     move_down:
-        li $t0, 0                       # $t0: column counter (col = 0)
-
-    move_down_column_loop:
-        li $t1, 2                       # $t1: row counter (start from the bottom, row = 2)
-        li $t2, 2                       # $t2: position = 2 (starting from bottom row)
-
-    move_down_shift_loop:
-        mul $t3, $t1, 3                 # Row offset (row * width)
-        add $t3, $t3, $t0               # Add column offset
-        sll $t4, $t3, 2                 # Byte offset for grid[$t3]
-        la $s0, grid
-        add $t4, $s0, $t4
-        lw $t5, 0($t4)                  # Load grid[$t3] into $t5
-
-        bnez $t5, down_handle_non_zero  # If cell is non-zero, handle it
-        j down_skip_zero                # If cell is zero, move to next row
-
-    down_handle_non_zero:
-        # Place non-zero value at position indicated by $t2
-        mul $t6, $t2, 3               # Calculate target row offset for non-zero cell
-        add $t6, $t6, $t0             # Add column offset
-        sll $t7, $t6, 2               # Byte offset for grid[$t6]
-        la $s0, grid
-        add $t7, $s0, $t7
-        sw $t5, 0($t7)                # Store non-zero value in new position
-
-        # Decrement target position only if we moved the value
-        addi $t2, $t2, -1             # Decrement position as we are moving down
-
-    down_skip_zero:
-        addi $t1, $t1, -1             # Move to the next row in the column
-        li $t8, -1
-        bgt $t1, $t8, move_down_shift_loop  # Repeat for all rows in column
-
-    # Combine adjacent cells if they are the same
-    move_down_combine_loop:
-        li $t1, 2                     # Start from row 2, second last row (bottom-up)
-        
-    down_combine_check_loop:
-        mul $t3, $t1, 3                # Row offset (row * width)
-        add $t3, $t3, $t0              # Add column offset
-        sll $t4, $t3, 2                # Byte offset for grid[$t3]
-        la $s0, grid
-        add $t4, $s0, $t4
-        lw $t5, 0($t4)                 # Load grid[$t3] (current cell)
-
-        addi $t9, $t1, -1              # $t9 = row - 1 (previous row)
-        mul $t6, $t9, 3                # Previous row offset
-        add $t6, $t6, $t0              # Add column offset
-        sll $t7, $t6, 2                # Byte offset for grid[previous_row]
-        la $s0, grid
-        add $t7, $s0, $t7
-        lw $t6, 0($t7)                 # Load grid[previous_row] (next cell)
-
-        # If current and previous cells are the same and non-zero, combine
-        bne $t5, $t6, down_skip_combine     # Skip if cells are not equal
-        beq $t5, $zero, down_skip_combine   # Skip if cells are zero
-
-        # Combine: multiply current cell by 2, set previous cell to 0
-        sll $t5, $t5, 1 	       # Double the value in the current cell
-        sw $t5, 0($t4)                 # Store doubled value back in current cell
-        sw $zero, 0($t7)               # Set previous cell to 0
-
-    down_skip_combine:
-        addi $t1, $t1, -1              # Move to the next row
-        li $t8, 0
-        bgt $t1, $t8, down_combine_check_loop   # Repeat until the second row
-
-        # Clear remaining cells in column after the shifted elements
-        move $t9, $t2                 # Start clearing from the current $t2 position
-
-    move_down_clear_loop:
-        mul $t6, $t9, 3               # Row offset for clearing
-        add $t6, $t6, $t0             # Column offset
-        sll $t7, $t6, 2               # Byte offset for grid[$t6]
-        la $s0, grid
-        add $t7, $s0, $t7
-        sw $zero, 0($t7)              # Set cell to 0
-
-        addi $t9, $t9, -1             # Move to the next row for clearing
-        li $t8, -1
-        bgt $t9, $t8, move_down_clear_loop
-
-        # Move to the next column
-        addi $t0, $t0, 1
-        li $t8, 3
-        blt $t0, $t8, move_down_column_loop  # Repeat for all columns
-
+        newline()
+        jal shift_down
+        jal combine_down
+        jal shift_down
         j spawn_get_empty
+
+    shift_down:
+        la $s0, grid
+        li $t0, 0                       # $t0: col = 0
+
+        down_shift_column_loop:
+            bge $t0, 3, down_shift_done   # col < 3
+            la  $s2, temp               # temp[GRID]             
+            li  $t1, 0                  # 0 to store at temp
+            li  $t2, 0                  # loop counter for temp[GRID] initialization
+
+        down_init_temp:                    # temp initialization
+            bge  $t2, 3, down_done_init_temp
+            sll  $t3, $t2, 2        
+            add  $t3, $s2, $t3
+            sw   $t1, 0($t3)            # Store 0 
+            addi $t2, $t2, 1            # t2++
+            j down_init_temp
+        #changes
+        down_done_init_temp:
+            li $t2, 3
+            subi $t1, $t2, 1              # $t1: pos = GRID - 1 = 2
+            move $t3, $t1                 # $t3: row = 2
+
+        down_shift_row_loop:
+            #changes
+            bltz  $t3, down_next_init   # row >= 0 
+            mul  $t4, $t3, $t2          # row * GRID // 
+            add  $t4, $t4, $t0          # row * GRID + col //
+
+            sll  $t5, $t4, 2
+            add  $t5, $s0, $t5
+            lw   $t5, 0($t5)            # Load arr[index]
+
+            bnez $t5, down_arr_to_temp  # arr[index] != 0
+            #changes
+            subi $t3, $t3, 1            # row--
+            j down_shift_row_loop
+
+        down_arr_to_temp:
+            sll  $t6, $t1, 2
+            add  $t6, $s2, $t6          # address of temp[pos]
+            sw   $t5, 0($t6)            # temp[pos] = arr[index]
+            #changes
+            subi $t1, $t1, 1            # pos--
+            #changes
+            subi $t3, $t3, 1            # row--
+            j down_shift_row_loop
+        #second loop
+        down_next_init:
+            li  $t3, 0                   # row = 0
+        
+        down_next_row_loop:
+            bge	 $t3, $t2, down_shift_increment_row # row < 3
+            mul  $t4, $t3, 3            # row * GRID //
+            add  $t4, $t4, $t0          # row * GRID + col //
+            sll  $t5, $t4, 2
+            add  $t5, $s0, $t5          # address of arr[index]
+
+            sll  $t6, $t3, 2
+            add  $t6, $s2, $t6
+            lw   $t6, 0($t6)            # Load temp[col]
+
+            sw   $t6, 0($t5)            # arr[row * GRID + col] = temp[col]
+            addi $t3, $t3, 1
+
+            j down_next_row_loop        
+
+        down_shift_increment_row:
+            addi $t0, $t0, 1            # col++
+            j down_shift_column_loop
+    
+        down_shift_done:
+            jr $ra                      # shift function done
+
+    combine_down:
+        la $s0, grid
+        li $t0, 0                       # $t0: col = 0
+        li $t1, 3                       # t1 = GRID
+
+        down_combine_column_loop:
+            bge $t0, 3, down_combine_done # col < 3 //
+            #changes
+            subi $t2, $t1, 1            # $t2: row = GRID - 1 = 2
+
+        down_combine_row_loop:
+            blez  $t2, down_combine_increment_column
+            # $t4: curr_index
+            mul  $t3, $t2, $t1           # row * GRID //
+            add  $t4, $t3, $t0           # row * GRID + col //
+            
+            sll  $t5, $t4, 2
+            add  $t5, $s0, $t5
+            lw   $t7, 0($t5)            # Load arr[curr_index]
+            
+            #changes: next_index (row + 1) * 3 + col
+            subi $t6, $t2, 1            # row - 1         
+            mul  $t3, $t6, $t1          # (row - 1) * 3
+            add  $t3, $t3, $t0          # (row - 1) * 3 + col
+            
+            # add  $t3, $t3, $t6          # row * GRID + (row + 1)
+            
+            sll  $t6, $t3, 2
+            add  $t6, $s0, $t6
+            lw   $t8, 0($t6)            # Load arr[next_index]
+
+            beq  $t7, $t8, down_combine_next_condition # arr[curr_index] == arr[next_index]
+            
+            #changes
+            subi $t2, $t2, 1            # row-- 
+            j down_combine_row_loop     
+        
+        down_combine_next_condition:
+            beqz $t7, down_combine_increment_row    # arr[curr_index] != 0
+
+            sll $t7, $t7, 1             # * 2
+            sw  $t7, 0($t5)             # arr[curr_index] *= 2
+
+            li  $t8, 0
+            sw  $t8, 0($t6)             # arr[next_index] = 0
+
+        down_combine_increment_row:
+            #change: second for loop row
+            subi $t2, $t2, 1            # row--
+            j down_combine_row_loop    
+
+        down_combine_increment_column:
+            #changes: top for loop col
+            addi $t0, $t0, 1            # col++
+            j down_combine_column_loop
+
+        down_combine_done:
+            jr $ra                      # combine function done
 
 # ============================= MOVE RIGHT ================================
 
@@ -570,14 +656,14 @@
             bge  $t2, 3, r_done_init_temp
             sll  $t3, $t2, 2
             add  $t3, $s2, $t3
-            sw   $t1, 0($t3)
-            addi $t2, $t2, 1        # Store 0
+            sw   $t1, 0($t3)        # Store 0
+            addi $t2, $t2, 1        # t2++
             j r_init_temp
 
         r_done_init_temp:
             li   $t2, 3             # GRID
-            subi $t1, $t2, 1        # pos = GRID - 1
-            move $t3, $t1           # t2 = col
+            subi $t1, $t2, 1        # $t1: pos = GRID - 1 = 2
+            move $t3, $t1           # $t3: col = 2
 
         r_shift_column_loop:
             bltz $t3, r_next_init
@@ -596,6 +682,7 @@
             sll  $t6, $t1, 2
             add  $t6, $s2, $t6
             sw   $t5, 0($t6)            # temp[pos] = arr[index]
+            
             subi $t1, $t1, 1            # pos--
 
             subi $t3, $t3, 1            # col--
@@ -634,10 +721,11 @@
 
         r_combine_row_loop:
             bge  $t0, 3, r_combine_done
-            subi $t2, $t1, 1            # t2 = column
+            subi $t2, $t1, 1            # $t2: col = GRID - 1 = 2
 
         r_combine_column_loop:
             blez $t2, r_combine_increment_row
+            
             mul  $t3, $t0, 3            # row * GRID
             add  $t4, $t3, $t2          # row * GRID + col
 
