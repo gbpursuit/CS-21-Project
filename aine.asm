@@ -56,14 +56,7 @@
     grid: .space 36
     empty:.space 36
     temp: .space 12
-    width: .word 3
-
-    # # DIRECTION MOVES
-    # MOVE_UP:    .word -3    # -GRID (3x3 grid)
-    # MOVE_DOWN:  .word 3     # GRID
-    # MOVE_LEFT:  .word -1
-    # MOVE_RIGHT: .word 1
-
+    
 .text
     main:
         print_string(prompt)
