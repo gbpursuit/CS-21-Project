@@ -8,10 +8,17 @@
     move %option, $v0
 .end_macro
 
-.macro movement
-    do_syscall(12)
-    move $t0, $v0
+.macro movement 
+    la $a0, buffer
+    li $a2, 2
+    do_syscall(8)
+    lb $t0, 0($a0)
 .end_macro
+
+# .macro movement
+#     do_syscall(12)
+#     move $t0, $v0
+# .end_macro
 
 .macro print_string(%string)
     la $a0, %string
@@ -56,6 +63,7 @@
     grid: .space 36
     empty:.space 36
     temp: .space 12
+    buffer: .space 2
     
 .text
     main:
