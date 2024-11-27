@@ -10,15 +10,10 @@
 
 .macro movement 
     la $a0, buffer
-    li $a2, 2
+    li $a1, 3
     do_syscall(8)
     lb $t0, 0($a0)
 .end_macro
-
-# .macro movement
-#     do_syscall(12)
-#     move $t0, $v0
-# .end_macro
 
 .macro print_string(%string)
     la $a0, %string
@@ -51,6 +46,9 @@
     end_game: .asciiz "\nNo valid moves left. Please try again.\n"
     quit_game: .asciiz "\nYou quitted the game.\n"
     winner: .asciiz "\nCongratulations! You won.\n"
+    error_input: .asciiz "Paki-ayos po ng input mga mamser. Powers of two at below 512 lang pwede.\n"
+    new_error_input: .asciiz "Medyo makulet tayo ah. Isa nalang mageend 'to.\n"
+    new_error_input_1: .asciiz "Ge bawal ka na maglaro.\n"
 
     # GRID
     grid_divider: .asciiz "+---+---+---+\n"
@@ -62,6 +60,7 @@
     .align 2
     grid: .space 36
     empty:.space 36
+    new_arr: .space 36
     temp: .space 12
     buffer: .space 2
     
@@ -218,9 +217,14 @@
 
     move_up:
         newline()
+        jal initialize_new_arr
         jal shift_up
         jal combine_up
         jal shift_up
+        jal check_two_arr
+        move $t9, $v0
+
+        beqz $t9, displayGrid
         j spawn_get_empty
 
     shift_up:
@@ -358,10 +362,15 @@
 # ============================= MOVE LEFT ================================
 
     move_left:
-    	newline()
+        newline()
+        jal initialize_new_arr
         jal shift_left
         jal combine_left
         jal shift_left
+        jal check_two_arr
+        move $t9, $v0
+
+        beqz $t9, displayGrid
         j spawn_get_empty
 
     shift_left:
@@ -496,9 +505,14 @@
 
     move_down:
         newline()
+        jal initialize_new_arr
         jal shift_down
         jal combine_down
         jal shift_down
+        jal check_two_arr
+        move $t9, $v0
+
+        beqz $t9, displayGrid
         j spawn_get_empty
 
     shift_down:
@@ -638,10 +652,15 @@
 
     move_right:
     	newline()
+        jal initialize_new_arr  # lipat ung values ni arr to new_arr
         jal shift_right
         jal combine_right
         jal shift_right
-        j spawn_get_empty
+        jal check_two_arr
+        move $t9, $v0
+
+        beqz $t9, displayGrid   # returned 0 -- print arr lang ulit
+        j spawn_get_empty       # returned 1 -- spawn new tiles
 
     shift_right:
         la $s0, grid
@@ -769,19 +788,108 @@
 
     startState:
         la $s0, grid
-        li $t0, 0              			# $t0: array counter
-        li $t1, 9              			# $t1: grid counter
+        li $t0, 0              			    # $t0: array counter
+        li $t1, 9              			    # $t1: grid counter
+        li $t5, 2                           # condition check
+        li $t6, 0                           # error message counter
         
     getInput:
-        bge  $t0, $t1, displayGrid		# i >= 9
+        bge  $t0, $t1, displayGrid		    # i >= 9
         sll  $t2, $t0, 2
-        add  $t2, $s0, $t2		    	# $t2: address of grid[$t0]
+        add  $t2, $s0, $t2		    	    # $t2: address of grid[$t0]
         
         get_input($t3)
-        sw   $t3, 0($t2)		    	# store back to grid[$t0]
+        bgt  $t3, 512, error_message        # Input is greater than 512
+        bltz $t3, error_message             # Input is less than 0
+
+        subi $t7, $t3, 1
+        and  $t7, $t3, $t7
+        bnez $t7, error_message             # Input is not a power of two
+
+        div  $t3, $t5
+        mfhi $t4
+        bnez $t4, error_message             # Input is odd
+
+        sw   $t3, 0($t2)		    	    # store back to grid[$t0]
         
         addi $t0, $t0, 1
         j getInput
+
+# ============================= EASTER EGG ================================
+
+    error_message:
+        addi $t6, $t6, 1                    
+        ble  $t6, 3, print_error_message    
+        ble  $t6, 4, new_error_message      
+        j new_error_message_1               
+
+    print_error_message:
+        print_string(error_input)          
+        j getInput                          
+
+    new_error_message:
+        print_string(new_error_input)       
+        j getInput                          
+
+    new_error_message_1:
+        print_string(new_error_input_1)     
+        exit()        
+
+# ============================= INITIALIZE NEW ARR ================================
+
+    initialize_new_arr:
+        la $s0, grid
+        la $s3, new_arr
+        li $t0, 0              			# $t0: array counter
+        li $t1, 9              			# $t1: grid counter
+        
+    load_to_new_arr:
+        bge $t0, $t1, done_initialize
+        sll $t2, $t0, 2
+        add $t2, $s0, $t2               # address of arr[i]
+        lw  $t2, 0($t2)
+
+        sll $t3, $t0, 2
+        add $t3, $s3, $t3               # address of new_arr[i]
+
+        sw  $t2, 0($t3)                 # new_arr[i] = arr[i]
+
+        addi $t0, $t0, 1
+        j load_to_new_arr
+
+    done_initialize:
+        jr $ra
+
+# ============================= CHECK IF THE GRID CHANGED ================================
+
+    check_two_arr:
+        la $s0, grid
+        la $s3, new_arr
+        li $t0, 0              			# $t0: array counter
+        li $t1, 9              			# $t1: grid counter
+        
+    loop_to_check:
+        bge $t0, $t1, nothing_changed
+        sll $t2, $t0, 2
+        add $t2, $s0, $t2               # address of arr[i]
+        lw  $t2, 0($t2)
+
+        sll $t3, $t0, 2
+        add $t3, $s3, $t3               # address of new_arr[i]
+        lw  $t3, 0($t3)
+
+        bne $t2, $t3, something_changed     
+
+        addi $t0, $t0, 1
+        j loop_to_check
+
+    nothing_changed:
+        li $v0, 0                       # punta ka kay displaygrid lang
+        jr $ra    
+
+    something_changed:                  # punta ka kay spawn_empty
+        li $v0, 1
+        jr $ra
 
 # ============================= SPAWN TILES ================================
 
@@ -887,18 +995,18 @@
         next_1_column: 			                # arr[cur] == arr[cur + MOVE_RIGHT]
             addi $t6, $t3, 1       	            # cur + MOVE RIGHT
             sll  $t6, $t6, 2                	    
-            add  $t6, $s0, $t6     	            # Address of arr[cur + MOVE RIGHT]
-            lw   $t6, 0($t6)       	            # Load arr[cur + MOVE_RIGHT]
+            add  $t6, $s0, $t6                  # Address of arr[cur + MOVE RIGHT]
+            lw   $t6, 0($t6)                    # Load arr[cur + MOVE_RIGHT]
             beq  $t5, $t6, continue_game        # game continues	
             
             addi $t1, $t1, 1
             j inner_loop
             
         check_flag:
-            beqz $t8, exit          # no 0 found -- end game
+            beqz $t8, exit                      # no 0 found -- end game
             
         continue_game:
-            jr $ra                  # continue game 
+            jr $ra                              # continue game 
 
     win:
         print_string(winner)
