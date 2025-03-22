@@ -7,6 +7,5 @@ In this implementation, we extended the classic **2048 game** by allowing differ
 
 ### **Key Features:**  
 - **Dynamic Board Size:** Supports **3x3**, **4×4**, **5×5**, **6×6**, and an extendable **n×n** version.  
-- **MIPS Assembly Implementation:** Written in **MIPS Assembly**, focusing on **register-based data storage** instead of arrays.  
-- **Winning Condition:** The game ends when a tile reaches **2048** (or a higher value, depending on board size).  
-- **Optimized for Registers:** A special **exponent-based encoding** was used to store tile values efficiently.  
+- **MIPS Assembly Implementation:** Written in **MIPS Assembly**.  
+- **Winning Condition:** The game ends when a tile reaches **512** or **2048** (depending on board size).  
